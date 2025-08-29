@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>QuickBooks OAuth Redirect</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https:; img-src 'self' data:; style-src 'unsafe-inline' 'self'; script-src 'self' 'unsafe-inline'">
+  <style>
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-width: 720px; margin: 12vh auto; padding: 0 16px; line-height: 1.55; }
+    h1 { margin-bottom: 6px; }
+    .muted { color:#666; }
+    .ok { color:#2e7d32; font-weight:600; }
+    .err { color:#c62828; font-weight:600; }
+    code { background:#f5f5f5; padding:2px 6px; border-radius:4px; }
+    pre { background:#f5f5f5; padding:10px; border-radius:6px; overflow:auto; }
+    .hide { display:none; }
+  </style>
+</head>
+<body>
+  <h1>Finalizing QuickBooks Connection…</h1>
+  <p id="status" class="muted">Processing authorization response.</p>
+  <div id="ok" class="ok hide">✅ Connected. You can close this tab.</div>
+  <div id="bad" class="err hide">Authorization failed.</div>
+  <pre id="detail" class="hide"></pre>
+
+  <script>
+    (function () {
+      // === Configure to backend ===
+      var BACKEND_EXCHANGE_URL = "https://YOUR-BACKEND-DOMAIN.example.com/api/qbo/oauth/callback";
+
+      function qs(name) { return new URLSearchParams(window.location.search).get(name); }
+      var code = qs("code");
+      var state = qs("state");
+      var error = qs("error") || qs("error_description");
+      var statusEl = document.getElementById("status");
+      var okEl = document.getElementById("ok");
+      var badEl = document.getElementById("bad");
+      var detailEl = document.getElementById("detail");
+
+      if (error) {
+        statusEl.className = "muted hide";
+        badEl.classList.remove("hide");
+        detailEl.textContent = String(error);
+        detailEl.classList.remove("hide");
+        return;
+      }
+      if (!code) {
+        statusEl.className = "muted hide";
+        badEl.classList.remove("hide");
+        detailEl.textContent = "Missing ?code in redirect.";
+        detailEl.classList.remove("hide");
+        return;
+      }
+
+      // Optional: to use PKCE, retrieve/verifier here
+      // var code_verifier = sessionStorage.getItem("qbo_pkce_verifier");
+
+      var payload = { code: code, state: state /*, code_verifier: code_verifier */ };
+
+      fetch(BACKEND_EXCHANGE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // credentials: "include", // enable if I choose to have backend use cookies/session
+        body: JSON.stringify(payload)
+      })
+      .then(function (r) {
+        if (!r.ok) return r.text().then(function(t){ throw new Error(t || ("HTTP "+r.status)); });
+        return r.json().catch(function(){ return {}; });
+      })
+      .then(function (res) {
+        statusEl.className = "muted hide";
+        okEl.classList.remove("hide");
+        detailEl.textContent = JSON.stringify(res, null, 2);
+        detailEl.classList.remove("hide");
+      })
+      .catch(function (e) {
+        statusEl.className = "muted hide";
+        badEl.classList.remove("hide");
+        detailEl.textContent = (e && e.message ? e.message : String(e)).slice(0, 4000);
+        detailEl.classList.remove("hide");
+      });
+    })();
+  </script>
+</body>
+</html>
