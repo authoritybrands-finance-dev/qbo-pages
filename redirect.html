@@ -1,88 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>QuickBooks OAuth Redirect</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="referrer" content="no-referrer" />
+    <head>
+        <meta charset="UTF-8" />
+        <title>QuickBooks OAuth Redirect</title>
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <meta name="referrer" content="no-referrer" />
 
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none';
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none';
                  connect-src https://qbo-oauth.cmoore-bfb.workers.dev;
                  style-src 'unsafe-inline';
                  script-src 'unsafe-inline';
-                 img-src 'self' data:;">
-  <style>
-    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; max-width: 720px; margin: 12vh auto; padding: 0 16px; line-height: 1.55; }
-    h1 { margin-bottom: 6px; }
-    .muted { color:#666; }
-    .ok { color:#2e7d32; font-weight:600; }
-    .err { color:#c62828; font-weight:600; }
-    pre { background:#f5f5f5; padding:10px; border-radius:6px; overflow:auto; }
-    .hide { display:none; }
-  </style>
-</head>
-<body>
-  <h1>Finalizing QuickBooks Connection…</h1>
-  <p id="status" class="muted">Processing authorization response.</p>
-  <div id="ok" class="ok hide">✅ Connected. You can close this tab.</div>
-  <div id="bad" class="err hide">Authorization failed.</div>
-  <pre id="detail" class="hide"></pre>
+                 img-src 'self' data:;"
+        />
+        <style>
+            body {
+                font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+                max-width: 720px;
+                margin: 12vh auto;
+                padding: 0 16px;
+                line-height: 1.55;
+            }
+            h1 {
+                margin-bottom: 6px;
+            }
+            .muted {
+                color: #666;
+            }
+            .ok {
+                color: #2e7d32;
+                font-weight: 600;
+            }
+            .err {
+                color: #c62828;
+                font-weight: 600;
+            }
+            pre {
+                background: #f5f5f5;
+                padding: 10px;
+                border-radius: 6px;
+                overflow: auto;
+            }
+            .hide {
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Finalizing QuickBooks Connection…</h1>
+        <p id="status" class="muted">Processing authorization response.</p>
+        <div id="ok" class="ok hide">✅ Connected. You can close this tab.</div>
+        <div id="bad" class="err hide">Authorization failed.</div>
+        <pre id="detail" class="hide"></pre>
 
-  <script>
-    (function () {
-      var BACKEND_EXCHANGE_URL = "https://qbo-oauth.cmoore-bfb.workers.dev/api/qbo/oauth/callback";
+        <script>
+            (function () {
+                var BACKEND_EXCHANGE_URL = "https://qbo-oauth.cmoore-bfb.workers.dev/api/qbo/oauth/callback";
 
-      var params  = new URLSearchParams(window.location.search);
-      var code    = params.get("code");
-      var state   = params.get("state");
-      var error   = params.get("error") || params.get("error_description");
-      var realmId = params.get("realmId"); // Intuit sends company id here
+                var params = new URLSearchParams(window.location.search);
+                var code = params.get("code");
+                var state = params.get("state");
+                var error = params.get("error") || params.get("error_description");
+                var realmId = params.get("realmId"); // Intuit sends company id here
 
-      try { history.replaceState(null, "", location.pathname); } catch (e) {}
+                try {
+                    history.replaceState(null, "", location.pathname);
+                } catch (e) {}
 
-      var statusEl = document.getElementById("status");
-      var okEl     = document.getElementById("ok");
-      var badEl    = document.getElementById("bad");
-      var detailEl = document.getElementById("detail");
+                var statusEl = document.getElementById("status");
+                var okEl = document.getElementById("ok");
+                var badEl = document.getElementById("bad");
+                var detailEl = document.getElementById("detail");
 
-      function fail(msg) {
-        statusEl.classList.add("hide");
-        badEl.classList.remove("hide");
-        detailEl.textContent = String(msg).slice(0, 4000);
-        detailEl.classList.remove("hide");
-      }
+                function fail(msg) {
+                    statusEl.classList.add("hide");
+                    badEl.classList.remove("hide");
+                    detailEl.textContent = String(msg).slice(0, 4000);
+                    detailEl.classList.remove("hide");
+                }
 
-      if (error) return fail("Authorization error: " + error);
-      if (!code) return fail("Missing ?code in redirect.");
+                if (error) return fail("Authorization error: " + error);
+                if (!code) return fail("Missing ?code in redirect.");
+                if (!realmId) return fail("Missing ?realmId in redirect."); // <-- add this line
 
-      // Later add PKCE, include the verifier:
-      // var code_verifier = sessionStorage.getItem("qbo_pkce_verifier");
+                // var code_verifier = sessionStorage.getItem("qbo_pkce_verifier");
+                var payload = { code: code, state: state, realmId: realmId /*, code_verifier */ };
 
-      var payload = { code: code, state: state, realmId: realmId /*, code_verifier */ };
+                var ctrl = new AbortController();
+                var t = setTimeout(function () {
+                    ctrl.abort();
+                }, 10000);
 
-      // Optional: add a fetch timeout to avoid hanging UIs
-      var ctrl = new AbortController();
-      var t = setTimeout(function(){ ctrl.abort(); }, 10000);
-
-      fetch(BACKEND_EXCHANGE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // credentials: "include", // enable if I choose to have backend use cookies/session
-        body: JSON.stringify(payload),
-        signal: ctrl.signal
-      })
-      .then(function (r) {
-        clearTimeout(t);
-        if (!r.ok) return r.text().then(function (txt) { throw new Error(txt || ("HTTP " + r.status)); });
-        return r.json().catch(function(){ return {}; });
-      })
-      .then(function () {
-        statusEl.classList.add("hide");
-        okEl.classList.remove("hide");
-      })
-      .catch(function (e) { fail(e.message || String(e)); });
-    })();
-  </script>
-</body>
+                fetch(BACKEND_EXCHANGE_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                    signal: ctrl.signal,
+                })
+                    .then(function (r) {
+                        clearTimeout(t);
+                        if (!r.ok)
+                            return r.text().then(function (txt) {
+                                throw new Error(txt || "HTTP " + r.status);
+                            });
+                        return r.json().catch(function () {
+                            return {};
+                        });
+                    })
+                    .then(function () {
+                        statusEl.classList.add("hide");
+                        okEl.classList.remove("hide");
+                    })
+                    .catch(function (e) {
+                        fail(e.message || String(e));
+                    });
+            })();
+        </script>
+    </body>
 </html>
