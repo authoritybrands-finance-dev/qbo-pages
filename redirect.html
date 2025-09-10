@@ -9,7 +9,7 @@
         <meta
             http-equiv="Content-Security-Policy"
             content="default-src 'none';
-                 connect-src https://qbo-oauth.cmoore-bfb.workers.dev;
+                 connect-src https://qbo-oauth.mts-bfb.workers.dev;
                  style-src 'unsafe-inline';
                  script-src 'unsafe-inline';
                  img-src 'self' data:;"
@@ -56,7 +56,7 @@
 
         <script>
             (function () {
-                var BACKEND_EXCHANGE_URL = "https://qbo-oauth.cmoore-bfb.workers.dev/api/qbo/oauth/callback/legacy";
+                var BACKEND_EXCHANGE_URL = "https://qbo-oauth.mts-bfb.workers.dev/api/qbo/oauth/callback/legacy";
 
                 var params = new URLSearchParams(window.location.search);
                 var code = params.get("code");
